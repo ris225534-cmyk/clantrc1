@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>TRCoins | CLAN ONLINE SYSTEM</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Exo+2:wght@300;600&display=swap');
+        
+        :root {
+            --gold: #f1c40f; --blue: #00d2ff; --red: #ff4757; 
+            --bg: #0b0e14; --card: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            font-family: 'Exo 2', sans-serif; background: var(--bg); color: #fff;
+            margin: 0; min-height: 100vh;
+            background: radial-gradient(circle at top, #1a1a2e, #0b0e14);
+        }
+
+        .fade-in { animation: fadeIn 0.5s ease forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        #authScreen { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+        .auth-card { background: var(--card); padding: 40px; border-radius: 20px; border: 1px solid var(--gold); text-align: center; box-shadow: 0 0 30px rgba(241, 196, 15, 0.1); }
+
+        nav { background: rgba(0,0,0,0.8); padding: 15px; border-bottom: 2px solid var(--gold); display: flex; justify-content: center; gap: 15px; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; }
+        .nav-btn { background: none; border: none; color: #fff; font-family: 'Orbitron', sans-serif; cursor: pointer; font-size: 13px; transition: 0.3s; padding: 5px 10px; }
+        .nav-btn:hover { color: var(--gold); text-shadow: 0 0 10px var(--gold); }
+
+        .container { width: 95%; max-width: 1000px; margin: 30px auto; display: none; }
+        .active { display: block; }
+
+        .card { background: var(--card); border-radius: 15px; padding: 25px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 20px; backdrop-filter: blur(5px); position: relative; }
+        h1, h2 { font-family: 'Orbitron', sans-serif; color: var(--gold); margin-top: 0; }
+
+        input, select { background: #000; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 8px; width: 100%; box-sizing: border-box; margin: 10px 0; font-size: 16px; }
+        button { background: var(--gold); color: #000; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-family: 'Orbitron', sans-serif; transition: 0.3s; }
+        button:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(241, 196, 15, 0.4); }
+
+        .avatar { width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--gold); background: #111; margin-bottom: 10px; box-shadow: 0 0 15px rgba(241, 196, 15, 0.3); }
+        .top-avatar { width: 35px; height: 35px; border-radius: 50%; border: 1px solid var(--gold); vertical-align: middle; margin-right: 10px; }
+
+        .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; }
+        .item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 12px; text-align: center; }
+        
+        .inv-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin-bottom: 8px; border-left: 4px solid var(--blue); }
+        .time-warn { font-size: 12px; color: var(--red); }
+
+        #logBox { background: #000; color: #0f0; font-family: monospace; height: 120px; overflow-y: scroll; padding: 10px; border-radius: 8px; font-size: 12px; text-align: left; }
+        .top-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    </style>
+</head>
+<body>
+
+<div id="authScreen">
+    <div class="auth-card fade-in">
+        <h1>ACCESS POINT</h1>
+        <input type="text" id="logNick" placeholder="Ник Discord">
+        <input type="password" id="logPass" placeholder="Пароль">
+        <button onclick="auth()">CONNECT</button>
+        <p style="font-size: 11px; color: #666; margin-top: 15px;">Пароль создается при первом входе</p>
+    </div>
+</div>
+
+<nav>
+    <button class="nav-btn" onclick="showTab('profile')">PROFILE</button>
+    <button class="nav-btn" onclick="showTab('shop')">MARKET</button>
+    <button class="nav-btn" onclick="showTab('rating')">LEADERS</button>
+    <button id="admLink" class="nav-btn" style="display:none; color:var(--red)" onclick="showTab('admin')">ADMIN</button>
+    <button class="nav-btn" style="color: #ff4757; font-size: 11px;" onclick="logout()">LOGOUT</button>
+</nav>
+
+<div id="profile" class="container active">
+    <div class="card fade-in" style="text-align: center;">
+        <img id="uAvatar" src="" class="avatar">
+        <h2 id="uName">---</h2>
+        <div style="font-size: 35px; font-weight: bold; margin: 5px 0;"><span id="uBal">0</span> <span style="font-size: 14px; color: var(--gold)">TRC</span></div>
+        <div style="color: var(--red); font-size: 12px; margin-bottom: 20px;">
+            ⚠️ Сгорание предметов через 72ч!
+        </div>
+        <h3 style="text-align: left; border-bottom: 1px solid #333; padding-bottom: 5px;">🎒 Твой Инвентарь</h3>
+        <div id="uInv"></div>
+    </div>
+</div>
+
+<div id="shop" class="container">
+    <div class="card fade-in">
+        <h2 id="shStatus">МАГАЗИН ЗАКРЫТ</h2>
+        <div id="shGrid" class="item-grid"></div>
+    </div>
+</div>
+
+<div id="rating" class="container">
+    <div class="card fade-in">
+        <h2>🏆 ТОП ИГРОКОВ</h2>
+        <div id="topList"></div>
+    </div>
+</div>
+
+<div id="admin" class="container">
+    <div class="card fade-in" style="border-color: var(--red);">
+        <h2>👑 ПАНЕЛЬ ВЛАДЕЛЬЦА</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+            <div>
+                <h3>👥 УПРАВЛЕНИЕ ИГРОКАМИ</h3>
+                <input type="text" id="admTo" placeholder="Ник игрока">
+                <input type="number" id="admVal" placeholder="Сумма">
+                <div style="display: flex; gap: 5px;">
+                    <button onclick="changeBalance(true)" style="flex:1;">ВЫДАТЬ</button>
+                    <button onclick="changeBalance(false)" style="background: var(--red); color: #fff; flex:1;">ЗАБРАТЬ</button>
+                </div>
+                <button onclick="admKick()" style="background: #444; color: #ff4757; width: 100%; margin-top: 10px; border: 1px solid var(--red);">❌ УДАЛИТЬ АККАУНТ</button>
+            </div>
+            <div>
+                <h3>📦 МАРКЕТ</h3>
+                <select id="fruitList"></select>
+                <input type="number" id="admQty" placeholder="Кол-во" value="1">
+                <button onclick="updateStock()">ДОБАВИТЬ</button>
+                <button onclick="clearStock()" style="background: var(--red); color: #fff;">ОЧИСТИТЬ</button>
+            </div>
+        </div>
+        <hr style="margin: 20px 0; border: 0.1px solid #333;">
+        <button id="toggleShopBtn" onclick="toggleShop()" style="width: 100%;">ПЕРЕКЛЮЧИТЬ МАГАЗИН</button>
+        <h3>📩 ЗАЯВКИ</h3>
+        <div id="admReqs"></div>
+        <h3>📜 ЛОГИ</h3>
+        <div id="logBox"></div>
+    </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDSotXIeWIPZmohcUkjEQph1sc8pfaFvHE",
+  authDomain: "clantrc-62099.firebaseapp.com",
+  databaseURL: "https://clantrc-62099-default-rtdb.firebaseio.com",
+  projectId: "clantrc-62099",
+  storageBucket: "clantrc-62099.firebasestorage.app",
+  messagingSenderId: "1056897976845",
+  appId: "1:1056897976845:web:2f241821484ec71162a344"
+};
+
+firebase.initializeApp(firebaseConfig);
+const rdb = firebase.database();
+
+const PRICES = {"Rocket": 50, "Spin": 50, "Blade": 50, "Spring": 50, "Bomb": 50, "Smoke": 75, "Spike": 75, "Flame": 75, "Ice": 75, "Sand": 75, "Dark": 75, "Eagle": 75, "Diamond": 100, "Light": 100, "Rubber": 100, "Ghost": 100, "Magma": 100, "Quake": 150, "Love": 300, "Creation": 300, "Spider": 300, "Sound": 300, "Phoenix": 300, "Portal": 450, "Lightning": 850, "Pain": 400, "Blizzard": 415, "Gravity": 425, "Mammoth": 425, "T-Rex": 425, "Dough": 675, "Shadow": 400, "Buddha": 450, "Venom": 400, "Gas": 775, "Spirit": 450, "Kitsune": 2660, "Control": 850, "Dragon": 8000, "Yeti": 875, "Tiger": 1000};
+
+let myNick = localStorage.getItem('trc_nick') || "";
+let globalData = {};
+
+function auth() {
+    const nick = document.getElementById('logNick').value.trim();
+    const pass = document.getElementById('logPass').value;
+    if(!nick || !pass) return alert("Заполни поля!");
+
+    rdb.ref('users/' + nick).once('value', s => {
+        const u = s.val();
+        if(!u) {
+            rdb.ref('users/' + nick).set({ pass, bal: 500, inv: [] });
+            loginSuccess(nick);
+        } else if(u.pass === pass) {
+            loginSuccess(nick);
+        } else {
+            alert("Неверный пароль!");
+        }
+    });
+}
+
+function loginSuccess(nick) {
+    myNick = nick;
+    localStorage.setItem('trc_nick', nick);
+    document.getElementById('authScreen').style.display = 'none';
+    if(nick === "Owner_Admin") document.getElementById('admLink').style.display = 'block';
+    
+    const sel = document.getElementById('fruitList');
+    sel.innerHTML = "";
+    Object.keys(PRICES).forEach(f => {
+        let o = document.createElement('option'); o.value = f; o.innerText = f; sel.appendChild(o);
+    });
+
+    rdb.ref().on('value', s => {
+        globalData = s.val() || {};
+        checkAutoFunctions();
+        render();
+    });
+}
+
+function logout() {
+    if(confirm("Выйти из аккаунта?")) {
+        localStorage.removeItem('trc_nick');
+        location.reload();
+    }
+}
+
+function render() {
+    if(!myNick) return;
+    const me = globalData.users?.[myNick] || { bal: 0, inv: [] };
+    
+    document.getElementById('uName').innerText = myNick.toUpperCase();
+    document.getElementById('uBal').innerText = (me.bal || 0).toLocaleString();
+    document.getElementById('uAvatar').src = `https://robohash.org/${myNick}.png?set=set4`;
+
+    const invDiv = document.getElementById('uInv');
+    invDiv.innerHTML = "";
+    if(me.inv) {
+        Object.entries(me.inv).forEach(([id, item]) => {
+            const h = Math.round((item.expire - Date.now()) / 3600000);
+            invDiv.innerHTML += `
+                <div class="inv-item">
+                    <span><b>${item.name}</b> <br> <span class="time-warn">Сгорит через ${h}ч</span></span>
+                    <button onclick="withdraw('${id}', '${item.name}')">ВЫВОД</button>
+                </div>`;
+        });
+    }
+
+    const isReady = globalData.shopOpen && Date.now() < globalData.shopExpire;
+    const shStatus = document.getElementById('shStatus');
+    shStatus.innerText = isReady ? "🛒 МАРКЕТ ОТКРЫТ" : "🔒 МАРКЕТ ЗАКРЫТ";
+    shStatus.style.color = isReady ? "var(--gold)" : "var(--red)";
+    
+    const grid = document.getElementById('shGrid');
+    grid.innerHTML = "";
+    if(isReady && globalData.stock) {
+        Object.entries(globalData.stock).forEach(([name, qty]) => {
+            if(qty > 0) {
+                grid.innerHTML += `
+                    <div class="item">
+                        <b>${name}</b><br><span style="color:var(--gold)">${PRICES[name]} TRC</span><br>
+                        <small>Сток: ${qty}</small><br><br>
+                        <button onclick="buy('${name}')" style="padding:5px 10px; font-size:11px">BUY</button>
+                    </div>`;
+            }
+        });
+    }
+
+    const topDiv = document.getElementById('topList');
+    topDiv.innerHTML = "";
+    Object.entries(globalData.users || {}).sort((a,b) => b[1].bal - a[1].bal).slice(0, 10).forEach(([n, d], i) => {
+        topDiv.innerHTML += `
+            <div class="top-row">
+                <span>#${i+1} <img class="top-avatar" src="https://robohash.org/${n}.png?set=set4"> ${n}</span>
+                <b>${(d.bal || 0).toLocaleString()}</b>
+            </div>`;
+    });
+
+    if(myNick === "Owner_Admin") {
+        document.getElementById('toggleShopBtn').innerText = isReady ? "ЗАКРЫТЬ МАГАЗИН" : "ОТКРЫТЬ МАГАЗИН (24Ч)";
+        document.getElementById('admReqs').innerHTML = (globalData.requests || []).map((r, i) => `
+            <div class="inv-item"><span>${r.u}: ${r.item}</span> <button onclick="closeReq(${i})">OK</button></div>
+        `).join('');
+        document.getElementById('logBox').innerHTML = (globalData.logs || []).map(l => `<div>${l}</div>`).reverse().join('');
+    }
+}
+
+function buy(name) {
+    const me = globalData.users[myNick];
+    if(me.bal >= PRICES[name] && globalData.stock[name] > 0) {
+        rdb.ref('users/'+myNick+'/bal').set(me.bal - PRICES[name]);
+        rdb.ref('stock/'+name).set(globalData.stock[name] - 1);
+        rdb.ref('users/'+myNick+'/inv').push({ name, expire: Date.now() + 259200000 });
+        addLog(`${myNick} купил ${name}`);
+    } else { alert("Недостаточно TRC или нет в наличии!"); }
+}
+
+function withdraw(id, name) {
+    rdb.ref('users/'+myNick+'/inv/'+id).remove();
+    const reqs = globalData.requests || [];
+    reqs.push({ u: myNick, item: name });
+    rdb.ref('requests').set(reqs);
+    alert("Заявка отправлена владельцу!");
+}
+
+function changeBalance(plus) {
+    const t = document.getElementById('admTo').value.trim();
+    const v = parseInt(document.getElementById('admVal').value);
+    if(globalData.users[t] && v) {
+        const newBal = plus ? (globalData.users[t].bal || 0) + v : (globalData.users[t].bal || 0) - v;
+        rdb.ref('users/'+t+'/bal').set(newBal);
+        addLog(`Админ изменил баланс ${t} на ${v}`);
+    } else { alert("Игрок не найден!"); }
+}
+
+function admKick() {
+    const target = document.getElementById('admTo').value.trim();
+    if (!target) return alert("Введите ник игрока!");
+    if (target === "Owner_Admin") return alert("Нельзя удалить владельца!");
+    if (!globalData.users[target]) return alert("Игрок не найден!");
+
+    if (confirm(`УДАЛИТЬ игрока ${target} навсегда?`)) {
+        rdb.ref('users/' + target).remove();
+        addLog(`⚠️ УДАЛЕН АККАУНТ: ${target}`);
+        alert("Игрок удален!");
+    }
+}
+
+function updateStock() {
+    const f = document.getElementById('fruitList').value;
+    const q = parseInt(document.getElementById('admQty').value);
+    rdb.ref('stock/'+f).set((globalData.stock?.[f] || 0) + q);
+}
+
+function clearStock() { if(confirm("Очистить склад?")) rdb.ref('stock').remove(); }
+
+function toggleShop() {
+    const isOpen = globalData.shopOpen && Date.now() < globalData.shopExpire;
+    rdb.ref('shopOpen').set(!isOpen);
+    rdb.ref('shopExpire').set(isOpen ? 0 : Date.now() + 86400000);
+}
+
+function checkAutoFunctions() {
+    const now = Date.now();
+    Object.entries(globalData.users || {}).forEach(([uName, uData]) => {
+        if(uData.inv) {
+            Object.entries(uData.inv).forEach(([id, item]) => {
+                if(now > item.expire) rdb.ref('users/'+uName+'/inv/'+id).remove();
+            });
+        }
+    });
+}
+
+function closeReq(i) {
+    const r = [...(globalData.requests || [])]; r.splice(i,1);
+    rdb.ref('requests').set(r);
+}
+
+function addLog(m) {
+    const l = globalData.logs || [];
+    l.push(new Date().toLocaleTimeString() + ": " + m);
+    if(l.length > 50) l.shift();
+    rdb.ref('logs').set(l);
+}
+
+function showTab(id) {
+    document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+
+if(myNick) loginSuccess(myNick);
+</script>
+</body>
+</html>
